@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { mockCompanies } from '../lib/mockDb';
+import { supabase } from '../lib/supabase';
 import { Search, MapPin, Building, Star, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -11,9 +11,15 @@ export default function Companies() {
     fetchCompanies();
   }, [search]);
 
-  const fetchCompanies = () => {
-    const res = mockCompanies.getAll({ search });
-    setCompanies(res);
+  const fetchCompanies = async () => {
+    let query = supabase.from('companies').select('*');
+    if (search) {
+      query = query.ilike('name', `%${search}%`);
+    }
+    const { data, error } = await query;
+    if (!error && data) {
+      setCompanies(data);
+    }
   };
 
   return (

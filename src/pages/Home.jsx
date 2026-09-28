@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { mockJobs, mockCompanies, mockDrives } from '../lib/mockDb';
+import { supabase } from '../lib/supabase';
 import { ArrowRight, Briefcase, Users, TrendingUp, Award, CheckCircle, Calendar, MapPin, Clock } from 'lucide-react';
 import './Home.css';
 
@@ -37,9 +37,26 @@ export default function Home() {
   const [drives, setDrives]               = useState([]);
 
   useEffect(() => {
-    setFeaturedJobs(mockJobs.getAll().slice(0, 3));
-    setCompanies(mockCompanies.getAll().slice(0, 6));
-    setDrives(mockDrives.getAll().slice(0, 3));
+    const fetchHomeData = async () => {
+      try {
+        const [
+          { data: jobsData },
+          { data: companiesData },
+          { data: drivesData }
+        ] = await Promise.all([
+          supabase.from('jobs').select(`*, companies(name, logo)`).order('created_at', { ascending: false }).limit(3),
+          supabase.from('companies').select('*').limit(6),
+          supabase.from('placement_drives').select(`*, companies(name, logo)`).order('created_at', { ascending: false }).limit(3)
+        ]);
+
+        if (jobsData) setFeaturedJobs(jobsData.map(j => ({ ...j, company: j.companies })));
+        if (companiesData) setCompanies(companiesData);
+        if (drivesData) setDrives(drivesData.map(d => ({ ...d, company: d.companies })));
+      } catch (err) {
+        console.error("Error fetching home data:", err);
+      }
+    };
+    fetchHomeData();
   }, []);
 
   return (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { mockApplications } from '../lib/mockDb';
+import { supabase } from '../lib/supabase';
 import { Briefcase, Building, Clock, MapPin, Search } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 
@@ -14,8 +14,19 @@ export default function Applications() {
     }
   }, [user]);
 
-  const fetchApps = () => {
-    setApplications(mockApplications.getByStudent(user.id));
+  const fetchApps = async () => {
+    const { data, error } = await supabase
+      .from('applications')
+      .select('*, jobs(*, companies(name, logo))')
+      .eq('student_id', user.id)
+      .order('applied_at', { ascending: false });
+
+    if (!error && data) {
+      setApplications(data.map(app => ({
+        ...app,
+        job: app.jobs ? { ...app.jobs, company: app.jobs.companies } : null
+      })));
+    }
   };
 
   if (!user) return <Navigate to="/login" />;

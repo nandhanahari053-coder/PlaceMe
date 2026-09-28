@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { mockApplications, mockJobs, mockNotifications, mockDrives } from '../lib/mockDb';
+import { supabase } from '../lib/supabase';
 import { Navigate, Link } from 'react-router-dom';
 import { Briefcase, Bell, CheckCircle, Clock, Award, Building, FileText } from 'lucide-react';
 
@@ -14,11 +14,11 @@ export default function Dashboard() {
       <div className="section-header" style={{ marginTop: '24px' }}>
         <div>
           <h1 className="section-title">Dashboard</h1>
-          <p className="section-subtitle">Welcome back, {profile?.name?.split(' ')[0]}!</p>
+          <p className="section-subtitle">Welcome back, {profile?.name?.split(' ')[0] || 'User'}!</p>
         </div>
       </div>
       
-      {user.role === 'student' ? <StudentDashboard /> : <CompanyDashboard />}
+      {profile?.role === 'student' ? <StudentDashboard /> : <CompanyDashboard />}
     </div>
   );
 }
@@ -32,12 +32,64 @@ function StudentDashboard() {
 
   useEffect(() => {
     if (user) {
-      setApplications(mockApplications.getByStudent(user.id));
-      setRecommended(mockJobs.getAll().slice(0, 3)); // Mock logic: just take first 3 jobs
-      setDrives(mockDrives.getAll().slice(0, 2));
-      setNotifications(mockNotifications.getByUser(user.id).slice(0, 5));
+      fetchDashboardData();
     }
   }, [user]);
+
+  const fetchDashboardData = async () => {
+    try {
+      // 1. Fetch Applications
+      const { data: appsData } = await supabase
+        .from('applications')
+        .select('*, jobs(*, companies(name, logo))')
+        .eq('student_id', user.id)
+        .order('applied_at', { ascending: false });
+
+      if (appsData) {
+        setApplications(appsData.map(app => ({
+          ...app,
+          job: app.jobs ? { ...app.jobs, company: app.jobs.companies } : null
+        })));
+      }
+
+      // 2. Fetch Recommended Jobs (Mock: just getting 3 latest)
+      const { data: jobsData } = await supabase
+        .from('jobs')
+        .select('*, companies(name, logo)')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (jobsData) {
+        setRecommended(jobsData.map(j => ({ ...j, company: j.companies })));
+      }
+
+      // 3. Fetch Upcoming Drives
+      const { data: drivesData } = await supabase
+        .from('placement_drives')
+        .select('*, companies(name, logo)')
+        .eq('is_active', true)
+        .order('drive_date', { ascending: true })
+        .limit(2);
+        
+      if (drivesData) {
+        setDrives(drivesData.map(d => ({ ...d, company: d.companies })));
+      }
+
+      // 4. Fetch Notifications
+      const { data: notifsData } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (notifsData) setNotifications(notifsData);
+
+    } catch (err) {
+      console.error('Error fetching dashboard data', err);
+    }
+  };
 
   const stats = [
     { label: 'Applications', value: applications.length, icon: <Briefcase /> },
@@ -152,6 +204,7 @@ function StudentDashboard() {
                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{d.drive_date} @ {d.location}</div>
                </div>
              ))}
+             {drives.length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No upcoming drives</div>}
           </div>
         </div>
 
@@ -161,19 +214,31 @@ function StudentDashboard() {
 }
 
 function CompanyDashboard() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
 
   useEffect(() => {
     if (user) {
-      setJobs(mockJobs.getByCompany(user.id)); // Using user.id as proxy for company_id for simplicity in mock
+      fetchCompanyJobs();
     }
   }, [user]);
 
+  const fetchCompanyJobs = async () => {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('posted_by', user.id)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setJobs(data);
+    }
+  };
+
   const stats = [
     { label: 'Active Jobs', value: jobs.filter(j => j.is_active).length, icon: <Briefcase /> },
-    { label: 'Total Applications', value: jobs.reduce((sum, j) => sum + j.applicants_count, 0), icon: <FileText /> },
-    { label: 'Hires', value: 0, icon: <CheckCircle /> }, // Dummy
+    { label: 'Total Applications', value: jobs.reduce((sum, j) => sum + (j.applicants_count || 0), 0), icon: <FileText /> },
+    { label: 'Hires', value: 0, icon: <CheckCircle /> }, // Dummy for now
   ];
 
   return (
@@ -214,7 +279,7 @@ function CompanyDashboard() {
                        {job.is_active ? 'Active' : 'Closed'}
                      </span>
                    </td>
-                   <td style={{ padding: '16px 0' }}>{job.applicants_count}</td>
+                   <td style={{ padding: '16px 0' }}>{job.applicants_count || 0}</td>
                    <td style={{ padding: '16px 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                      {new Date(job.created_at).toLocaleDateString()}
                    </td>

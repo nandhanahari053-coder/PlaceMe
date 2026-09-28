@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { mockJobs, mockApplications } from '../lib/mockDb';
+import { supabase } from '../lib/supabase';
 import { Search, MapPin, Briefcase, Filter } from 'lucide-react';
 
 export default function Jobs() {
@@ -17,17 +17,43 @@ export default function Jobs() {
   useEffect(() => {
     fetchJobs();
     if (user && user.role === 'student') {
-      const apps = mockApplications.getByStudent(user.id);
-      setAppliedJobIds(apps.map(a => a.job_id));
+      fetchAppliedJobs();
     }
   }, [user]);
 
-  const fetchJobs = () => {
-    const res = mockJobs.getAll({ search, category, type: jobType });
-    setJobs(res);
+  const fetchAppliedJobs = async () => {
+    const { data, error } = await supabase
+      .from('applications')
+      .select('job_id')
+      .eq('student_id', user.id);
+    if (!error && data) {
+      setAppliedJobIds(data.map(a => a.job_id));
+    }
   };
 
-  const handleApply = (jobId) => {
+  const fetchJobs = async () => {
+    let query = supabase
+      .from('jobs')
+      .select('*, companies(name, logo)')
+      .eq('is_active', true);
+      
+    if (category !== 'All') {
+      query = query.eq('category', category);
+    }
+    if (jobType !== 'All') {
+      query = query.eq('type', jobType);
+    }
+    if (search) {
+      query = query.ilike('title', `%${search}%`);
+    }
+
+    const { data, error } = await query;
+    if (!error && data) {
+      setJobs(data.map(job => ({ ...job, company: job.companies })));
+    }
+  };
+
+  const handleApply = async (jobId) => {
     if (!user) {
       alert("Please login to apply.");
       return;
@@ -36,9 +62,13 @@ export default function Jobs() {
       alert("Only students can apply to jobs.");
       return;
     }
-    const res = mockApplications.apply({ job_id: jobId, student_id: user.id });
-    if (res.error) {
-      alert(res.error.message);
+    
+    const { error } = await supabase
+      .from('applications')
+      .insert([{ job_id: jobId, student_id: user.id }]);
+      
+    if (error) {
+      alert(error.message);
     } else {
       setAppliedJobIds([...appliedJobIds, jobId]);
       alert("Successfully applied!");

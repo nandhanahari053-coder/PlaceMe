@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { mockProfiles } from '../lib/mockDb';
 import { Navigate } from 'react-router-dom';
 import { User, Mail, Phone, Book, GraduationCap, Code, MapPin, Building, Briefcase } from 'lucide-react';
 
@@ -21,14 +20,15 @@ export default function Profile() {
     setFormData(prev => ({ ...prev, skills: val.split(',').map(s => s.trim()) }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const res = mockProfiles.update(user.id, formData);
+    const res = await updateProfile(formData);
     if (!res.error) {
-      updateProfile(res.data);
       setIsEditing(false);
       setMsg('Profile updated successfully!');
       setTimeout(() => setMsg(''), 3000);
+    } else {
+      setMsg('Error: ' + res.error);
     }
   };
 
