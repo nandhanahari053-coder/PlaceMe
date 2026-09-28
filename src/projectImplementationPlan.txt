@@ -1,0 +1,46 @@
+STUDENT PLACEMENT PORTAL – WEBSITE BLUEPRINT
+
+1. Header
+ University logo and Placement Portal name
+ Navigation: Home | Dashboard | Jobs | Companies | Applications | Profile
+ Actions: Login | Register
+
+2. Hero Section
+ Headline: Your Career Starts Here
+ Description: Access job opportunities, internships, company updates, and placement resources in one place.
+ Primary CTA: Explore Jobs / Login
+ Visual: Placement dashboard preview
+
+3. Core Features
+ Student Profile: View and update personal details, resume, and skills.
+ Job Listings: Browse available jobs and internships from companies.
+ Company Profiles: View company details, eligibility criteria, and job roles.
+ Applications: Apply for jobs and track application status.
+ Placement Updates: Get notifications about upcoming drives and deadlines.
+ Resume Builder: Create and upload professional resumes.
+ Interview Preparation: Access aptitude tests, mock interviews, and resources.
+
+4. How the Portal Works
+ Student registers/logs into the portal.
+ Completes profile and uploads resume.
+ Browses job opportunities.
+ Applies for suitable positions.
+ Tracks application status and receives updates.
+
+5. Dashboard Preview
+ Profile completion status
+ Recommended jobs/internships
+ Application status tracker
+ Upcoming placement drives
+ Notifications and announcements
+
+6. Final Call-To-Action
+ Headline: Start Your Placement Journey Today
+ CTA: Go to Dashboard / Apply Now
+
+7. Design Direction
+ Clean and modern UI with professional look
+ Simple navigation with structured layout
+ Use cards for job listings and updates
+ Responsive design (mobile + desktop friendly)
+ Use colors like blue/white for a professional feel
