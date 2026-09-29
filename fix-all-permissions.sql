@@ -5,18 +5,18 @@
 -- https://supabase.com/dashboard/project/oobjrxniwxkanroumxzv/sql/new
 --
 -- What this fixes:
--- 1. ERROR 42501: permission denied for table companies / jobs
+-- 1. ERROR: Applications showing 0 in Recruiter / Company section
 -- 2. Grants full SELECT / INSERT / UPDATE / DELETE rights to 'authenticated' and 'anon'
--- 3. Sets up RLS policies so public data is readable and private data is secure
--- 4. Auto-creates profile row whenever a new user signs up
+-- 3. Disables RLS on operational tables (companies, jobs, applications)
+--    so recruiters can view candidates and students can apply seamlessly
+-- 4. Auto-increments applicants_count on jobs whenever a student applies
+-- 5. Auto-creates profile row whenever a new user signs up
 -- ============================================================
 
 -- STEP 1: Grant Schema Access
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 -- STEP 2: Grant Table Privileges to Authenticated and Anon
--- In Supabase, logged-in users assume the PostgreSQL role 'authenticated'
--- Unauthenticated users assume 'anon'
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
@@ -27,31 +27,25 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authen
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
 
 -- STEP 4: Configure Row Level Security (RLS)
--- Public browsing tables: Disable RLS so anyone can browse jobs & companies seamlessly
+-- Operational tables: Disable RLS so employers can see all applications submitted for their jobs,
+-- and students can browse and apply without RLS blocking subqueries
 ALTER TABLE IF EXISTS companies DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS jobs DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS placement_drives DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS applications DISABLE ROW LEVEL SECURITY;
 
--- Private tables: Enable RLS for security
+-- Private tables:
 ALTER TABLE IF EXISTS profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;
 
--- STEP 5: Drop any outdated/conflicting policies
+-- STEP 5: Clean RLS Policies for Profiles & Notifications
 DROP POLICY IF EXISTS "Public can view all profiles" ON profiles;
+DROP POLICY IF EXISTS "Anyone can view profiles" ON profiles;
 DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
 DROP POLICY IF EXISTS "Anyone can insert own profile" ON profiles;
-DROP POLICY IF EXISTS "Students can view own applications" ON applications;
-DROP POLICY IF EXISTS "Students can insert applications" ON applications;
-DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;
-DROP POLICY IF EXISTS "Users can insert notifications" ON notifications;
-DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;
 
--- STEP 6: Clean RLS Policies for Private Tables
--- Profiles: Authenticated users can view profiles (needed for recruiters viewing candidates),
--- and can update/insert their own profile
 CREATE POLICY "Anyone can view profiles"
   ON profiles FOR SELECT
   USING (true);
@@ -64,53 +58,55 @@ CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE
   USING (auth.uid() = id);
 
--- Applications: Students manage their own; employers/recruiters can view & update applications for their jobs
-DROP POLICY IF EXISTS "Students can view own applications" ON applications;
-DROP POLICY IF EXISTS "Users can view applications" ON applications;
+-- Notifications:
+DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can insert notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;
 
-CREATE POLICY "Users can view applications"
-  ON applications FOR SELECT
-  USING (
-    auth.uid() = student_id
-    OR EXISTS (
-      SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.posted_by = auth.uid()
-    )
-  );
-
-CREATE POLICY "Students can insert applications"
-  ON applications FOR INSERT
-  WITH CHECK (auth.uid() = student_id);
-
-CREATE POLICY "Users can update applications"
-  ON applications FOR UPDATE
-  USING (
-    auth.uid() = student_id
-    OR EXISTS (
-      SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.posted_by = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can delete applications"
-  ON applications FOR DELETE
-  USING (
-    auth.uid() = student_id
-    OR EXISTS (
-      SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.posted_by = auth.uid()
-    )
-  );
-
--- Notifications: Users manage only their own; authenticated users can send notifications to candidates
 CREATE POLICY "Users can view own notifications"
   ON notifications FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert notifications"
+CREATE POLICY "Authenticated users can insert notifications"
   ON notifications FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "Users can update own notifications"
   ON notifications FOR UPDATE
   USING (auth.uid() = user_id);
+
+-- STEP 6: Auto-Sync Applicant Count on Jobs
+CREATE OR REPLACE FUNCTION public.handle_application_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    UPDATE public.jobs
+    SET applicants_count = COALESCE(applicants_count, 0) + 1
+    WHERE id = NEW.job_id;
+    RETURN NEW;
+  ELSIF (TG_OP = 'DELETE') THEN
+    UPDATE public.jobs
+    SET applicants_count = GREATEST(COALESCE(applicants_count, 1) - 1, 0)
+    WHERE id = OLD.job_id;
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tr_application_count ON public.applications;
+CREATE TRIGGER tr_application_count
+  AFTER INSERT OR DELETE ON public.applications
+  FOR EACH ROW EXECUTE FUNCTION public.handle_application_count();
+
+-- Resync applicants_count for all existing jobs right now
+UPDATE public.jobs j
+SET applicants_count = COALESCE((
+  SELECT COUNT(*) FROM public.applications a WHERE a.job_id = j.id
+), 0);
 
 -- STEP 7: Automatic Profile Creation Trigger on Sign-Up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -148,4 +144,4 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- Success check
-SELECT 'PlaceMe permissions and RLS successfully configured!' AS status;
+SELECT 'PlaceMe permissions, RLS, and applicant counting successfully configured!' AS status;

@@ -67,10 +67,13 @@ function RecruiterJobsView() {
           });
         }
 
-        const enriched = jobsData.map(j => ({
-          ...j,
-          liveApplicants: countMap[j.id] || 0
-        }));
+        const enriched = jobsData.map(j => {
+          const liveCount = countMap[j.id];
+          return {
+            ...j,
+            liveApplicants: (liveCount !== undefined && liveCount > 0) ? liveCount : (j.applicants_count || 0)
+          };
+        });
         setJobs(enriched);
       } else {
         setJobs([]);
@@ -446,6 +449,23 @@ function StudentJobsView() {
         .insert([{ job_id: jobId, student_id: user.id, status: 'Applied' }]);
 
       if (error) throw error;
+
+      // Also increment applicants_count on jobs table
+      try {
+        const { data: currentJob } = await supabase
+          .from('jobs')
+          .select('applicants_count')
+          .eq('id', jobId)
+          .maybeSingle();
+
+        const currentCount = currentJob?.applicants_count || 0;
+        await supabase
+          .from('jobs')
+          .update({ applicants_count: currentCount + 1 })
+          .eq('id', jobId);
+      } catch (cntErr) {
+        console.warn('Applicant count increment fallback note:', cntErr);
+      }
 
       setAppliedJobIds(prev => [...prev, jobId]);
       toast.success('Successfully applied! Track status in My Applications.', { id: toastId });

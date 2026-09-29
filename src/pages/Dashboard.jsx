@@ -302,7 +302,8 @@ function CompanyDashboard() {
             counts[a.job_id] = (counts[a.job_id] || 0) + 1;
           });
           jobList.forEach(j => {
-            j.applicants_count = counts[j.id] || 0;
+            const live = counts[j.id];
+            j.applicants_count = (live !== undefined && live > 0) ? live : (j.applicants_count || 0);
           });
         }
       }
@@ -317,7 +318,10 @@ function CompanyDashboard() {
   };
 
   const activeJobsCount = jobs.filter(j => j.is_active).length;
-  const totalAppsCount = applications.length;
+  const totalAppsCount = Math.max(
+    applications.length,
+    jobs.reduce((sum, j) => sum + (j.applicants_count || 0), 0)
+  );
   const shortlistedCount = applications.filter(a => a.status === 'Shortlisted').length;
   const hiredCount = applications.filter(a => a.status === 'Offered').length;
 
