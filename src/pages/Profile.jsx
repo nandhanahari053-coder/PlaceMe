@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import { Navigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { User, Mail, Phone, Book, GraduationCap, Code, MapPin, Building, Briefcase } from 'lucide-react';
 
 export default function Profile() {
@@ -8,6 +10,12 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(profile || {});
   const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    if (profile) {
+      setFormData(profile);
+    }
+  }, [profile]);
 
   if (!user) return <Navigate to="/login" />;
 
@@ -24,15 +32,37 @@ export default function Profile() {
     e.preventDefault();
     const res = await updateProfile(formData);
     if (!res.error) {
+      // Sync company in companies table if recruiter
+      const isComp = user?.role === 'company' || profile?.role === 'company';
+      if (isComp) {
+        const compName = formData.company_name?.trim() || formData.name?.trim();
+        if (compName) {
+          try {
+            await supabase.from('companies').upsert({
+              name: compName,
+              industry: formData.company_industry || 'Technology',
+              location: formData.company_location || 'India',
+              size: formData.company_size || '50-200 employees',
+              description: formData.bio || `${compName} is a hiring partner on PlaceMe.`,
+              logo: compName.charAt(0).toUpperCase()
+            }, { onConflict: 'name' });
+          } catch (e) {
+            // ignore non-critical
+          }
+        }
+      }
+
       setIsEditing(false);
+      toast.success('Profile updated successfully!');
       setMsg('Profile updated successfully!');
       setTimeout(() => setMsg(''), 3000);
     } else {
+      toast.error('Error: ' + res.error);
       setMsg('Error: ' + res.error);
     }
   };
 
-  const isStudent = user.role === 'student';
+  const isStudent = user.role === 'student' || profile?.role === 'student';
 
   return (
     <div className="page container">

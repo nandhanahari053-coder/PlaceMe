@@ -64,10 +64,18 @@ CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE
   USING (auth.uid() = id);
 
--- Applications: Students manage their own; employers/recruiters can view applications
-CREATE POLICY "Students can view own applications"
+-- Applications: Students manage their own; employers/recruiters can view & update applications for their jobs
+DROP POLICY IF EXISTS "Students can view own applications" ON applications;
+DROP POLICY IF EXISTS "Users can view applications" ON applications;
+
+CREATE POLICY "Users can view applications"
   ON applications FOR SELECT
-  USING (auth.uid() = student_id);
+  USING (
+    auth.uid() = student_id
+    OR EXISTS (
+      SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.posted_by = auth.uid()
+    )
+  );
 
 CREATE POLICY "Students can insert applications"
   ON applications FOR INSERT
@@ -75,18 +83,30 @@ CREATE POLICY "Students can insert applications"
 
 CREATE POLICY "Users can update applications"
   ON applications FOR UPDATE
-  USING (auth.uid() = student_id OR EXISTS (
-    SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.posted_by = auth.uid()
-  ));
+  USING (
+    auth.uid() = student_id
+    OR EXISTS (
+      SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.posted_by = auth.uid()
+    )
+  );
 
--- Notifications: Users manage only their own
+CREATE POLICY "Users can delete applications"
+  ON applications FOR DELETE
+  USING (
+    auth.uid() = student_id
+    OR EXISTS (
+      SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.posted_by = auth.uid()
+    )
+  );
+
+-- Notifications: Users manage only their own; authenticated users can send notifications to candidates
 CREATE POLICY "Users can view own notifications"
   ON notifications FOR SELECT
   USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert notifications"
   ON notifications FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "Users can update own notifications"
   ON notifications FOR UPDATE
@@ -99,18 +119,24 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, name, email, role, profile_completion)
+  INSERT INTO public.profiles (id, name, email, role, profile_completion, company_name, college, branch)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'role', 'student'),
-    20
+    25,
+    NEW.raw_user_meta_data->>'company_name',
+    NEW.raw_user_meta_data->>'college',
+    NEW.raw_user_meta_data->>'branch'
   )
   ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     email = EXCLUDED.email,
-    role = EXCLUDED.role;
+    role = EXCLUDED.role,
+    company_name = COALESCE(EXCLUDED.company_name, profiles.company_name),
+    college = COALESCE(EXCLUDED.college, profiles.college),
+    branch = COALESCE(EXCLUDED.branch, profiles.branch);
   RETURN NEW;
 END;
 $$;

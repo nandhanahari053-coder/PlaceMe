@@ -39,11 +39,30 @@ CREATE POLICY "Users can update own profile"
 CREATE POLICY "Users can insert own profile"
   ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
--- Step 5: Applications - students see/submit only their own
-CREATE POLICY "Students can view own applications"
-  ON applications FOR SELECT USING (auth.uid() = student_id);
+-- Step 5: Applications - students see/submit only their own; employers see for their jobs
+DROP POLICY IF EXISTS "Students can view own applications" ON applications;
+DROP POLICY IF EXISTS "Users can view applications" ON applications;
+
+CREATE POLICY "Users can view applications"
+  ON applications FOR SELECT
+  USING (
+    auth.uid() = student_id
+    OR EXISTS (
+      SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.posted_by = auth.uid()
+    )
+  );
+
 CREATE POLICY "Students can insert applications"
   ON applications FOR INSERT WITH CHECK (auth.uid() = student_id);
+
+CREATE POLICY "Users can update applications"
+  ON applications FOR UPDATE
+  USING (
+    auth.uid() = student_id
+    OR EXISTS (
+      SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.posted_by = auth.uid()
+    )
+  );
 
 -- Step 6: Notifications - users see only their own
 CREATE POLICY "Users can view own notifications"

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Bell, Menu, X, GraduationCap, ChevronDown, LogOut, User, LayoutDashboard } from 'lucide-react';
+import { Bell, Menu, X, GraduationCap, ChevronDown, LogOut, User, LayoutDashboard, Briefcase, FileText } from 'lucide-react';
 
 import './Navbar.css';
 
@@ -25,22 +25,31 @@ const Navbar = () => {
 
   const handleLogout = () => { logout(); navigate('/'); };
 
-  const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/jobs', label: 'Jobs' },
-    { to: '/companies', label: 'Companies' },
-    ...(user ? [
-      { to: '/dashboard', label: 'Dashboard' },
-      { to: '/applications', label: 'Applications' },
-    ] : []),
-  ];
+  const isCompany = user?.role === 'company' || profile?.role === 'company';
+
+  const navLinks = isCompany
+    ? [
+        { to: '/dashboard', label: 'Dashboard' },
+        { to: '/jobs', label: 'Job Postings' },
+        { to: '/applications', label: 'Applications' },
+        { to: '/profile', label: 'Company Profile' },
+      ]
+    : [
+        { to: '/', label: 'Home' },
+        { to: '/jobs', label: 'Jobs' },
+        { to: '/companies', label: 'Companies' },
+        ...(user ? [
+          { to: '/dashboard', label: 'Dashboard' },
+          { to: '/applications', label: 'My Applications' },
+        ] : []),
+      ];
 
   return (
     <header className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`} id="main-navbar">
       <div className="navbar__inner container">
 
         {/* Logo */}
-        <Link to="/" className="navbar__logo" id="nav-logo">
+        <Link to={isCompany ? '/dashboard' : '/'} className="navbar__logo" id="nav-logo">
           <div className="navbar__logo-icon">
             <GraduationCap size={20} strokeWidth={2.2} />
           </div>
@@ -91,8 +100,22 @@ const Navbar = () => {
                     <Link to="/dashboard" className="navbar__dropdown-item" id="dropdown-dashboard">
                       <LayoutDashboard size={15} /> Dashboard
                     </Link>
+                    {isCompany ? (
+                      <>
+                        <Link to="/jobs" className="navbar__dropdown-item" id="dropdown-jobs">
+                          <Briefcase size={15} /> Job Postings
+                        </Link>
+                        <Link to="/applications" className="navbar__dropdown-item" id="dropdown-applications">
+                          <FileText size={15} /> Applications
+                        </Link>
+                      </>
+                    ) : (
+                      <Link to="/applications" className="navbar__dropdown-item" id="dropdown-applications">
+                        <FileText size={15} /> My Applications
+                      </Link>
+                    )}
                     <Link to="/profile" className="navbar__dropdown-item" id="dropdown-profile">
-                      <User size={15} /> My Profile
+                      <User size={15} /> {isCompany ? 'Company Profile' : 'My Profile'}
                     </Link>
                     <div className="navbar__dropdown-divider" />
                     <button className="navbar__dropdown-item navbar__dropdown-item--danger" onClick={handleLogout} id="dropdown-logout">

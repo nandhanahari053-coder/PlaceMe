@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Search, MapPin, Building, Star, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Companies() {
+  const { user, profile } = useAuth();
+  const isCompany = user?.role === 'company' || profile?.role === 'company';
+
+  if (isCompany) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const [companies, setCompanies] = useState([]);
   const [search, setSearch] = useState('');
 
