@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
-const Login = ({ onLogin }) => {
+const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '', role: 'student' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,26 +16,73 @@ const Login = ({ onLogin }) => {
     setError('');
   };
 
+  const validate = () => {
+    const email = formData.email.trim();
+    const password = formData.password;
+
+    if (!email) {
+      const msg = 'Please enter your email address.';
+      setError(msg);
+      toast.error(msg);
+      return false;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      const msg = 'Please enter a valid email address format (e.g. user@domain.com).';
+      setError(msg);
+      toast.error(msg);
+      return false;
+    }
+
+    if (!password) {
+      const msg = 'Please enter your password.';
+      setError(msg);
+      toast.error(msg);
+      return false;
+    }
+
+    if (password.length < 6) {
+      const msg = 'Password must be at least 6 characters.';
+      setError(msg);
+      toast.error(msg);
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all fields.');
-      return;
-    }
+    if (!validate()) return;
+
     setLoading(true);
-    await new Promise(res => setTimeout(res, 800)); // Simulate API call
-    // Demo login - in production connect to backend
-    const user = {
-      id: 1,
-      name: formData.role === 'student' ? 'Arjun Sharma' : 'TechCorp HR',
-      email: formData.email,
-      role: formData.role,
-      college: formData.role === 'student' ? 'IIT Bombay' : null,
-      company: formData.role === 'company' ? 'TechCorp Pvt. Ltd.' : null,
-    };
-    onLogin(user);
-    setLoading(false);
-    navigate(formData.role === 'student' ? '/student-dashboard' : '/company-dashboard');
+    setError('');
+    const toastId = toast.loading('Signing in to your account...');
+
+    try {
+      const result = await login({
+        email: formData.email.trim(),
+        password: formData.password,
+      });
+
+      if (result?.error) {
+        const errorMsg = typeof result.error === 'string' ? result.error : (result.error.message || 'Login failed.');
+        setError(errorMsg);
+        toast.error(`Login failed: ${errorMsg}`, { id: toastId });
+        setLoading(false);
+      } else {
+        toast.success('Signed in successfully! Redirecting...', { id: toastId });
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 600);
+      }
+    } catch (err) {
+      const errorMsg = err.message || 'An unexpected error occurred during login.';
+      setError(errorMsg);
+      toast.error(`Error: ${errorMsg}`, { id: toastId });
+      setLoading(false);
+    }
   };
 
   return (
@@ -131,7 +181,7 @@ const Login = ({ onLogin }) => {
           <div className="auth-demo-hint" id="login-demo-hint">
             <div className="auth-demo-hint__icon">💡</div>
             <div>
-              <strong>Demo:</strong> Enter any email & password to login as {formData.role}
+              <strong>Note:</strong> Sign in with your registered account credentials.
             </div>
           </div>
 

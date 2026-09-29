@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle(); // maybeSingle returns null (not an error) when 0 rows found
         
       if (error) {
         console.error('Error fetching profile:', error.message);
@@ -54,8 +54,23 @@ export const AuthProvider = ({ children }) => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        setUser(session.user);
-        const userProfile = await fetchProfile(session.user.id);
+        let userProfile = await fetchProfile(session.user.id);
+        
+        // If profile doesn't exist in DB yet, try to create one from metadata
+        if (!userProfile) {
+          const fallbackProfile = {
+            id: session.user.id,
+            name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email,
+            role: session.user.user_metadata?.role || 'student',
+            profile_completion: 20
+          };
+          const { data: created } = await supabase.from('profiles').upsert(fallbackProfile).select().maybeSingle();
+          userProfile = created || fallbackProfile;
+        }
+
+        const effectiveRole = userProfile?.role || session.user.user_metadata?.role || 'student';
+        setUser({ ...session.user, role: effectiveRole, name: userProfile?.name || session.user.user_metadata?.name || '' });
         setProfile(userProfile);
         refreshUnread(session.user.id);
       }
@@ -67,8 +82,21 @@ export const AuthProvider = ({ children }) => {
     // Listen for changes on auth state (login, logout, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        setUser(session.user);
-        const userProfile = await fetchProfile(session.user.id);
+        let userProfile = await fetchProfile(session.user.id);
+        if (!userProfile) {
+          const fallbackProfile = {
+            id: session.user.id,
+            name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email,
+            role: session.user.user_metadata?.role || 'student',
+            profile_completion: 20
+          };
+          const { data: created } = await supabase.from('profiles').upsert(fallbackProfile).select().maybeSingle();
+          userProfile = created || fallbackProfile;
+        }
+
+        const effectiveRole = userProfile?.role || session.user.user_metadata?.role || 'student';
+        setUser({ ...session.user, role: effectiveRole, name: userProfile?.name || session.user.user_metadata?.name || '' });
         setProfile(userProfile);
         refreshUnread(session.user.id);
       } else {
@@ -83,40 +111,56 @@ export const AuthProvider = ({ children }) => {
   }, [fetchProfile, refreshUnread]);
 
   const register = async (formData) => {
-    const { email, password, name, role } = formData;
+    const { email, password, name, role, college, branch, company_name } = formData;
     
-    // 1. Sign up the user in Supabase Auth
+    // Sign up — pass name, role, college, branch, company_name as metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: { 
+          name, 
+          role: role || 'student',
+          college: college || '',
+          branch: branch || '',
+          company_name: company_name || ''
+        },
+      },
     });
 
     if (authError) {
       return { error: authError.message };
     }
 
+    // When email confirmation is enabled, authData.user exists but
+    // authData.session is null — the user must verify their email first.
+    if (authData.user && !authData.session) {
+      return {
+        data: { user: authData.user },
+        confirmationPending: true,
+      };
+    }
+
+    // Email confirmation is disabled — session is live immediately.
     if (authData.user) {
-      // 2. Create the user profile in our custom 'profiles' table
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          { 
-            id: authData.user.id, 
-            name, 
-            email, 
-            role: role || 'student' 
-          }
-        ])
-        .select()
-        .single();
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
-        return { error: profileError.message };
+      let userProfile = await fetchProfile(authData.user.id);
+      if (!userProfile) {
+        const newProfile = {
+          id: authData.user.id,
+          name,
+          email,
+          role: role || 'student',
+          college: college || null,
+          branch: branch || null,
+          company_name: company_name || null,
+          profile_completion: 30
+        };
+        const { data: created } = await supabase.from('profiles').upsert(newProfile).select().maybeSingle();
+        userProfile = created || newProfile;
       }
-
-      setProfile(profileData);
-      return { data: { user: authData.user, profile: profileData } };
+      setProfile(userProfile);
+      setUser({ ...authData.user, role: userProfile?.role || role || 'student', name: userProfile?.name || name });
+      return { data: { user: authData.user, profile: userProfile } };
     }
     
     return { error: 'Registration failed for an unknown reason.' };
@@ -151,7 +195,7 @@ export const AuthProvider = ({ children }) => {
       .update(updatedData)
       .eq('id', user.id)
       .select()
-      .single();
+      .maybeSingle(); // maybeSingle returns null (not an error) when 0 rows matched
 
     if (error) {
       console.error('Error updating profile:', error);
