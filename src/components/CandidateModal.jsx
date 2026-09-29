@@ -33,16 +33,19 @@ export default function CandidateModal({ isOpen, onClose, application, onStatusC
 
       // Try sending notification to student
       if (candidate.id) {
-        await supabase
-          .from('notifications')
-          .insert([{
-            user_id: candidate.id,
-            title: `Application Update: ${job.title || 'Job'}`,
-            message: `Your application status has been updated to "${newStatus}".`,
-            type: newStatus === 'Rejected' ? 'error' : (newStatus === 'Offered' ? 'success' : 'info'),
-            is_read: false
-          }])
-          .catch(() => {});
+        try {
+          await supabase
+            .from('notifications')
+            .insert([{
+              user_id: candidate.id,
+              title: `Application Update: ${job.title || 'Job'}`,
+              message: `Your application status has been updated to "${newStatus}".`,
+              type: newStatus === 'Rejected' ? 'error' : (newStatus === 'Offered' ? 'success' : 'info'),
+              is_read: false
+            }]);
+        } catch (_notifErr) {
+          // Notification failure is non-critical — status update already succeeded
+        }
       }
 
       setCurrentStatus(newStatus);

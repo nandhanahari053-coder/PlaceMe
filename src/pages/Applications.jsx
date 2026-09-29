@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { 
-  Briefcase, Building, Clock, MapPin, Search, 
-  User, CheckCircle, XCircle, Award, FileText, 
-  ExternalLink, Filter, ChevronRight 
+import {
+  Briefcase, Building, Clock, MapPin, Search,
+  User, CheckCircle, XCircle, Award, FileText,
+  ExternalLink, Filter, ChevronRight
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import CandidateModal from '../components/CandidateModal';
@@ -59,70 +59,79 @@ function RecruiterApplicationsView() {
   const loadRecruiterData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch all jobs posted by this company user
+      // STEP 1: Fetch recruiter's own job postings
       const { data: jobsData, error: jobsErr } = await supabase
         .from('jobs')
         .select('*')
         .eq('posted_by', user.id)
         .order('created_at', { ascending: false });
 
-      if (jobsErr) throw jobsErr;
-      setCompanyJobs(jobsData || []);
+      if (jobsErr) {
+        console.error('Jobs fetch error:', jobsErr);
+        throw jobsErr;
+      }
 
-      if (!jobsData || jobsData.length === 0) {
+      const jobList = jobsData || [];
+      setCompanyJobs(jobList);
+
+      if (jobList.length === 0) {
         setApplications([]);
         setLoading(false);
         return;
       }
 
+      const jobIds = jobList.map(j => j.id);
       const jobMap = {};
-      jobsData.forEach(j => { jobMap[j.id] = j; });
-      const jobIds = jobsData.map(j => j.id);
+      jobList.forEach(j => { jobMap[j.id] = j; });
 
-      // 2. Fetch applications for all of the recruiter's jobs
-      const { data: appsData, error: appsErr } = await supabase
+      // STEP 2: Use a single joined query to fetch ALL applications for recruiter's jobs
+      // This single query is more reliable than separate .in() filter which may fail with RLS
+      const { data: appsRaw, error: appsErr } = await supabase
         .from('applications')
-        .select('*')
-        .in('job_id', jobIds)
+        .select(`
+          id,
+          job_id,
+          student_id,
+          status,
+          cover_letter,
+          resume_url,
+          applied_at,
+          updated_at,
+          jobs:job_id ( id, title, type, location, salary, stipend, category, posted_by ),
+          profiles:student_id ( id, name, email, phone, college, degree, branch, graduation_year, cgpa, skills, bio, resume_url, linkedin_url, github_url, profile_completion )
+        `)
         .order('applied_at', { ascending: false });
 
-      if (appsErr) throw appsErr;
+      if (appsErr) {
+        console.error('Applications fetch error:', appsErr);
+        throw appsErr;
+      }
 
-      if (!appsData || appsData.length === 0) {
+      if (!appsRaw || appsRaw.length === 0) {
         setApplications([]);
         setLoading(false);
         return;
       }
 
-      // 3. Fetch candidate student profiles
-      const studentIds = [...new Set(appsData.map(a => a.student_id).filter(Boolean))];
-      let profileMap = {};
-
-      if (studentIds.length > 0) {
-        const { data: profilesData, error: profilesErr } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', studentIds);
-
-        if (!profilesErr && profilesData) {
-          profilesData.forEach(p => { profileMap[p.id] = p; });
-        }
-      }
-
-      // 4. Combine into complete candidate application models
-      const enrichedApps = appsData.map(app => ({
-        ...app,
-        job: jobMap[app.job_id] || {},
-        candidate: profileMap[app.student_id] || {
-          name: 'Student Applicant',
-          email: 'Registered Student'
-        }
-      }));
+      // STEP 3: Filter only those that belong to this recruiter's jobs
+      const enrichedApps = appsRaw
+        .filter(app => {
+          // Keep if job_id is in this recruiter's job list
+          if (jobIds.includes(app.job_id)) return true;
+          // Or if the joined job record says this recruiter posted it
+          if (app.jobs && app.jobs.posted_by === user.id) return true;
+          return false;
+        })
+        .map(app => ({
+          ...app,
+          job: app.jobs || jobMap[app.job_id] || {},
+          candidate: app.profiles || { name: 'Student Applicant', email: 'N/A' }
+        }));
 
       setApplications(enrichedApps);
     } catch (err) {
       console.error('Error loading recruiter applications:', err);
-      toast.error('Could not load candidate applications.');
+      toast.error(`Could not load candidate applications: ${err.message || ''}`);
     } finally {
       setLoading(false);
     }
@@ -161,7 +170,7 @@ function RecruiterApplicationsView() {
             type: newStatus === 'Rejected' ? 'error' : (newStatus === 'Offered' ? 'success' : 'info'),
             is_read: false
           }])
-          .catch(() => {});
+          .catch(() => { });
       }
 
       handleStatusChangeLocally(app.id, newStatus);
@@ -309,9 +318,9 @@ function RecruiterApplicationsView() {
             const job = app.job || {};
 
             return (
-              <div 
-                key={app.id} 
-                className="glass-card" 
+              <div
+                key={app.id}
+                className="glass-card"
                 style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer' }}
                 onClick={() => setActiveModalApp(app)}
               >
@@ -415,12 +424,12 @@ function RecruiterApplicationsView() {
                 )}
 
                 {/* Footer Quick Status Updates */}
-                <div 
-                  style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    paddingTop: '14px', 
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingTop: '14px',
                     borderTop: '1px solid var(--border)',
                     flexWrap: 'wrap',
                     gap: '10px'
@@ -476,7 +485,7 @@ function RecruiterApplicationsView() {
             {applications.length === 0 ? 'No applications received yet' : 'No applications match your filter'}
           </h3>
           <p className="empty-state__desc" style={{ marginBottom: '24px' }}>
-            {companyJobs.length === 0 
+            {companyJobs.length === 0
               ? "You haven't posted any jobs yet. Create a job listing to start receiving candidate applications."
               : "When students apply to your job postings, their full profiles, contact details, and resumes will appear here."}
           </p>
@@ -561,7 +570,7 @@ function StudentApplicationsView() {
               <div style={{ fontSize: '2.5rem', width: '64px', height: '64px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)', flexShrink: 0 }}>
                 {app.job?.company?.logo || '🏢'}
               </div>
-              
+
               <div style={{ flex: 1, minWidth: '250px' }}>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '4px' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{app.job?.title || 'Job Opening'}</h3>
