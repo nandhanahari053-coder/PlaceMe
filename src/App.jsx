@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import SplashScreen from './components/SplashScreen';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -21,6 +22,11 @@ function PrivateRoute({ children }) {
 export default function App() {
   const { loading } = useAuth();
   const location = useLocation();
+  const [showSplash, setShowSplash] = useState(true);
+
+  if (showSplash) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  }
 
   if (loading) {
     return (
