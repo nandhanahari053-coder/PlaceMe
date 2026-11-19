@@ -162,7 +162,7 @@ export default function Profile() {
               <div>
                 <h2 style={{ fontSize: '1.8rem', fontWeight: 800 }}>{profile?.name}</h2>
                 <div style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginTop: '4px' }}>
-                  {profile?.email} {profile?.role === 'student' ? '🎓 Student' : '🏢 Company'}
+                  {profile?.email} {profile?.role === 'student' ? '🎓 Student' : '🏢 Recruiter'}
                 </div>
               </div>
               <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
@@ -197,7 +197,7 @@ export default function Profile() {
                 </div>
               ) : (
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', color: 'var(--blue-400)' }}>Company Details</h3>
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', color: 'var(--blue-400)' }}>Recruiter Details</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: 'var(--text-secondary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Briefcase size={16} /> {profile?.company_name || 'Not provided'}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Building size={16} /> {profile?.company_industry || 'Not provided'}</div>

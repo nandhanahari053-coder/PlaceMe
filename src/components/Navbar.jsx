@@ -32,7 +32,7 @@ const Navbar = () => {
         { to: '/dashboard', label: 'Dashboard' },
         { to: '/jobs', label: 'Job Postings' },
         { to: '/applications', label: 'Applications' },
-        { to: '/profile', label: 'Company Profile' },
+        { to: '/profile', label: 'Recruiter Profile' },
       ]
     : [
         { to: '/', label: 'Home' },
@@ -94,7 +94,7 @@ const Navbar = () => {
                   <div className="navbar__dropdown" id="nav-dropdown">
                     <div className="navbar__dropdown-header">
                       <div className="navbar__dropdown-name">{profile?.name}</div>
-                      <div className="navbar__dropdown-role">{profile?.role === 'student' ? '🎓 Student' : '🏢 Company'}</div>
+                      <div className="navbar__dropdown-role">{profile?.role === 'student' ? '🎓 Student' : '🏢 Recruiter'}</div>
                     </div>
                     <div className="navbar__dropdown-divider" />
                     <Link to="/dashboard" className="navbar__dropdown-item" id="dropdown-dashboard">
@@ -115,7 +115,7 @@ const Navbar = () => {
                       </Link>
                     )}
                     <Link to="/profile" className="navbar__dropdown-item" id="dropdown-profile">
-                      <User size={15} /> {isCompany ? 'Company Profile' : 'My Profile'}
+                      <User size={15} /> {isCompany ? 'Recruiter Profile' : 'My Profile'}
                     </Link>
                     <div className="navbar__dropdown-divider" />
                     <button className="navbar__dropdown-item navbar__dropdown-item--danger" onClick={handleLogout} id="dropdown-logout">

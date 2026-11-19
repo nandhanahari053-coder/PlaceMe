@@ -9,7 +9,7 @@ export default function Register() {
   const { register } = useAuth();
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', role: 'student',
-    college: '', branch: '', company_name: ''
+    college: 'chanakya university', branch: 'Bba', company_name: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,13 +68,6 @@ export default function Register() {
       return false;
     }
 
-    if (formData.role === 'company' && !formData.company_name?.trim()) {
-      const msg = 'Please enter your company / organization name.';
-      setError(msg);
-      toast.error(msg);
-      return false;
-    }
-
     return true;
   };
 
@@ -91,6 +84,9 @@ export default function Register() {
         ...formData,
         name: formData.name.trim(),
         email: formData.email.trim(),
+        college: 'chanakya university',
+        branch: 'Bba',
+        role: 'student',
       });
 
       if (result?.error) {
@@ -136,7 +132,6 @@ export default function Register() {
             <p className="auth-subtitle">Join India's top placement platform.</p>
           </div>
 
-          {/* Confirmation pending screen */}
           {confirmationSent ? (
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
               <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📧</div>
@@ -152,25 +147,7 @@ export default function Register() {
             </div>
           ) : (
             <>
-              {/* Role toggle */}
-              <div className="tabs" id="register-role-toggle" style={{ marginBottom: '24px' }}>
-                <button
-                  className={`tab-btn ${formData.role === 'student' ? 'active' : ''}`}
-                  onClick={() => setFormData(prev => ({ ...prev, role: 'student' }))}
-                  type="button"
-                >
-                  👨‍🎓 Student
-                </button>
-                <button
-                  className={`tab-btn ${formData.role === 'company' ? 'active' : ''}`}
-                  onClick={() => setFormData(prev => ({ ...prev, role: 'company' }))}
-                  type="button"
-                >
-                  🏢 Company / Recruiter
-                </button>
-              </div>
-
-              {/* Registration form */}
+              {/* Registration form — Students only */}
               <form onSubmit={handleSubmit} className="auth-form" id="register-form">
                 <div className="grid-2">
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
@@ -187,24 +164,6 @@ export default function Register() {
                     <label className="form-label">Password *</label>
                     <input name="password" type="password" className="form-input" placeholder="••••••••" value={formData.password} onChange={handleChange} required minLength={6} />
                   </div>
-
-                  {formData.role === 'student' ? (
-                    <>
-                      <div className="form-group">
-                        <label className="form-label">College / University</label>
-                        <input name="college" type="text" className="form-input" placeholder="e.g. IIT Delhi" value={formData.college} onChange={handleChange} />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Branch / Department</label>
-                        <input name="branch" type="text" className="form-input" placeholder="e.g. Computer Science" value={formData.branch} onChange={handleChange} />
-                      </div>
-                    </>
-                  ) : (
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                      <label className="form-label">Company Name *</label>
-                      <input name="company_name" type="text" className="form-input" placeholder="e.g. TechCorp Inc." value={formData.company_name} onChange={handleChange} required={formData.role === 'company'} />
-                    </div>
-                  )}
                 </div>
 
                 {error && (

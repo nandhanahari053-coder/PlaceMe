@@ -533,7 +533,7 @@ function CompanyDashboard() {
           
           {/* Company Profile Quick Card */}
           <div className="glass-card" style={{ padding: '24px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Company Profile</h3>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Recruiter Profile</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
               <div style={{
                 width: '56px',
@@ -565,7 +565,7 @@ function CompanyDashboard() {
             </div>
 
             <Link to="/profile" className="btn btn-secondary btn-full btn-sm">
-              Edit Company Profile
+              Edit Recruiter Profile
             </Link>
           </div>
 

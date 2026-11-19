@@ -120,7 +120,7 @@ const Login = () => {
               id="login-company-tab"
               type="button"
             >
-              🏢 Company
+              🏢 Recruiter
             </button>
           </div>
 
@@ -186,8 +186,17 @@ const Login = () => {
           </div>
 
           <div className="auth-footer">
-            Don't have an account?{' '}
-            <Link to="/register" className="auth-link" id="login-register-link">Create one free →</Link>
+            {formData.role === 'student' && (
+              <>
+                Don't have an account?{' '}
+                <Link to="/register" className="auth-link" id="login-register-link">Create one free →</Link>
+              </>
+            )}
+            {formData.role === 'company' && (
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Recruiter accounts are created by administrators. Contact support if you need access.
+              </span>
+            )}
           </div>
         </div>
 
