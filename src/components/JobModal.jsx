@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { X, Briefcase, PlusCircle, Check } from 'lucide-react';
+import { X, Briefcase, Check, Building2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function JobModal({ isOpen, onClose, onSuccess, initialJob = null }) {
   const { user, profile } = useAuth();
   const isEditing = Boolean(initialJob?.id);
 
-  const [formData, setFormData] = useState({
+  const emptyForm = () => ({
+    company_name: profile?.company_name || '',
     title: '',
-    category: 'Engineering',
+    category: 'General',
     type: 'Full-Time',
-    location: '',
+    location: profile?.company_location || '',
     is_remote: false,
     salary: '',
     stipend: '',
@@ -23,13 +24,16 @@ export default function JobModal({ isOpen, onClose, onSuccess, initialJob = null
     description: '',
   });
 
+  const [formData, setFormData] = useState(emptyForm());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (initialJob) {
       setFormData({
+        company_name: initialJob.company_name || '',
         title: initialJob.title || '',
-        category: initialJob.category || 'Engineering',
+        category: initialJob.category || 'General',
         type: initialJob.type || 'Full-Time',
         location: initialJob.location || '',
         is_remote: Boolean(initialJob.is_remote),
@@ -42,95 +46,36 @@ export default function JobModal({ isOpen, onClose, onSuccess, initialJob = null
         description: initialJob.description || '',
       });
     } else {
-      setFormData({
-        title: '',
-        category: 'Engineering',
-        type: 'Full-Time',
-        location: profile?.company_location || '',
-        is_remote: false,
-        salary: '',
-        stipend: '',
-        duration: '',
-        deadline: '',
-        skills: '',
-        requirements: '',
-        description: '',
-      });
+      setFormData(emptyForm());
     }
-  }, [initialJob, profile, isOpen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialJob, isOpen]);
 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const getOrCreateCompanyId = async () => {
-    const compName = profile?.company_name?.trim() || profile?.name?.trim() || 'Hiring Company';
-    try {
-      const { data: existingComp, error: searchErr } = await supabase
-        .from('companies')
-        .select('id')
-        .ilike('name', compName)
-        .limit(1)
-        .maybeSingle();
-
-      if (existingComp?.id) {
-        return existingComp.id;
-      }
-
-      // If no matching company found, create one
-      const { data: newComp, error: insertCompErr } = await supabase
-        .from('companies')
-        .insert([{
-          name: compName,
-          industry: profile?.company_industry || 'Technology',
-          location: profile?.company_location || formData.location || 'India',
-          size: profile?.company_size || '50-200 employees',
-          logo: compName.charAt(0).toUpperCase() || '🏢',
-          description: profile?.bio || `${compName} is actively hiring talented graduates.`,
-          rating: 4.5,
-          openings: 1
-        }])
-        .select('id')
-        .single();
-
-      if (newComp?.id) {
-        return newComp.id;
-      }
-      return null;
-    } catch (e) {
-      console.warn('Company lookup note:', e);
-      return null;
-    }
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim()) {
-      toast.error('Please enter a job title');
-      return;
-    }
+    if (!formData.title.trim()) { toast.error('Please enter a job title'); return; }
+    if (!formData.company_name.trim()) { toast.error('Please enter the company name'); return; }
 
     setLoading(true);
     const toastId = toast.loading(isEditing ? 'Updating job posting...' : 'Posting new job...');
 
     try {
-      const companyId = await getOrCreateCompanyId();
-
       const skillsArray = formData.skills
         ? formData.skills.split(',').map(s => s.trim()).filter(Boolean)
         : [];
-
       const requirementsArray = formData.requirements
         ? formData.requirements.split('\n').map(r => r.trim()).filter(Boolean)
         : [];
 
       const payload = {
+        company_name: formData.company_name.trim(),
         title: formData.title.trim(),
         category: formData.category,
         type: formData.type,
@@ -146,27 +91,18 @@ export default function JobModal({ isOpen, onClose, onSuccess, initialJob = null
         is_active: true,
       };
 
-      if (companyId) {
-        payload.company_id = companyId;
-      }
-
       if (isEditing) {
         const { error } = await supabase
           .from('jobs')
           .update(payload)
           .eq('id', initialJob.id)
           .eq('posted_by', user.id);
-
         if (error) throw error;
         toast.success('Job posting updated successfully!', { id: toastId });
       } else {
         payload.posted_by = user.id;
         payload.applicants_count = 0;
-
-        const { error } = await supabase
-          .from('jobs')
-          .insert([payload]);
-
+        const { error } = await supabase.from('jobs').insert([payload]);
         if (error) throw error;
         toast.success('Job posted successfully!', { id: toastId });
       }
@@ -196,6 +132,25 @@ export default function JobModal({ isOpen, onClose, onSuccess, initialJob = null
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+            {/* Company Name — full width, prominent */}
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Building2 size={15} color="var(--blue-400)" /> Company Name *
+              </label>
+              <input
+                name="company_name"
+                className="form-input"
+                placeholder="e.g. Infosys, Google, Chanakya Ventures"
+                value={formData.company_name}
+                onChange={handleChange}
+                required
+              />
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                This name appears on the job card visible to students.
+              </span>
+            </div>
+
             {/* Title & Category */}
             <div className="grid-2">
               <div className="form-group">
@@ -212,12 +167,8 @@ export default function JobModal({ isOpen, onClose, onSuccess, initialJob = null
 
               <div className="form-group">
                 <label className="form-label">Category</label>
-                <select
-                  name="category"
-                  className="form-input form-select"
-                  value={formData.category}
-                  onChange={handleChange}
-                >
+                <select name="category" className="form-input form-select" value={formData.category} onChange={handleChange}>
+                  <option value="General">General</option>
                   <option value="Engineering">Engineering</option>
                   <option value="Data Science">Data Science</option>
                   <option value="Product">Product</option>
@@ -232,14 +183,10 @@ export default function JobModal({ isOpen, onClose, onSuccess, initialJob = null
             <div className="grid-2">
               <div className="form-group">
                 <label className="form-label">Employment Type</label>
-                <select
-                  name="type"
-                  className="form-input form-select"
-                  value={formData.type}
-                  onChange={handleChange}
-                >
+                <select name="type" className="form-input form-select" value={formData.type} onChange={handleChange}>
                   <option value="Full-Time">Full-Time</option>
                   <option value="Internship">Internship</option>
+                  <option value="Internship to Placement">Internship to Placement</option>
                   <option value="Part-Time">Part-Time</option>
                   <option value="Contract">Contract</option>
                 </select>
@@ -276,13 +223,13 @@ export default function JobModal({ isOpen, onClose, onSuccess, initialJob = null
             <div className="grid-2">
               <div className="form-group">
                 <label className="form-label">
-                  {formData.type === 'Internship' ? 'Stipend' : 'Annual Salary / CTC'}
+                  {formData.type === 'Internship' || formData.type === 'Internship to Placement' ? 'Stipend / Package' : 'Annual Salary / CTC'}
                 </label>
                 <input
-                  name={formData.type === 'Internship' ? 'stipend' : 'salary'}
+                  name={formData.type === 'Internship' || formData.type === 'Internship to Placement' ? 'stipend' : 'salary'}
                   className="form-input"
-                  placeholder={formData.type === 'Internship' ? 'e.g. ₹25,000 / month' : 'e.g. ₹8,00,000 - ₹12,00,000 / year'}
-                  value={formData.type === 'Internship' ? formData.stipend : formData.salary}
+                  placeholder={formData.type === 'Internship' || formData.type === 'Internship to Placement' ? 'e.g. ₹25,000/mo → 4 LPA PPO' : 'e.g. ₹8,00,000/year'}
+                  value={formData.type === 'Internship' || formData.type === 'Internship to Placement' ? formData.stipend : formData.salary}
                   onChange={handleChange}
                 />
               </div>
@@ -331,7 +278,7 @@ export default function JobModal({ isOpen, onClose, onSuccess, initialJob = null
                 name="requirements"
                 className="form-input form-textarea"
                 rows={3}
-                placeholder="e.g.&#10;B.Tech/BE in CS/IT or related field&#10;Minimum 7.0 CGPA with no active backlogs&#10;Strong problem solving and communication skills"
+                placeholder={'e.g.\nB.Tech/BE in CS/IT or related field\nMinimum 7.0 CGPA with no active backlogs'}
                 value={formData.requirements}
                 onChange={handleChange}
               />

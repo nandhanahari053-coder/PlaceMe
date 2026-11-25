@@ -17,6 +17,10 @@
 }
 
 .hero__content { display: flex; flex-direction: column; align-items: flex-start; gap: 24px; }
+.hero__content--centered { align-items: center; text-align: center; max-width: 760px; width: 100%; margin: 0 auto; position: relative; z-index: 1; }
+.hero__content--centered .hero__desc { margin: 0 auto; max-width: 600px; }
+.hero__content--centered .hero__cta { justify-content: center; }
+.hero__content--centered .hero__skills { justify-content: center; }
 .hero__label {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 6px 16px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);

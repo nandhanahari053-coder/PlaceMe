@@ -145,7 +145,7 @@ function StudentDashboard() {
                   </div>
                   <div>
                     <div style={{ fontWeight: 600 }}>{app.job?.title}</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{app.job?.company?.name}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{app.job?.company_name || app.job?.company?.name}</div>
                   </div>
                 </div>
                 <span className={`badge ${app.status === 'Applied' ? 'badge-info' : 'badge-success'}`}>{app.status}</span>
@@ -166,7 +166,7 @@ function StudentDashboard() {
               <div key={job.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
                  <div>
                     <div style={{ fontWeight: 600 }}>{job.title}</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{job.company?.name}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{job.company_name || job.company?.name}</div>
                  </div>
                  <Link to="/jobs" className="btn btn-outline btn-sm">Apply</Link>
               </div>

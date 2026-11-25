@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
+const INITIAL_FORM = { email: '', password: '', role: 'student' };
+
 const Login = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const [formData, setFormData] = useState({ email: '', password: '', role: 'student' });
+  const { login, user } = useAuth();
+  const [formData, setFormData] = useState(INITIAL_FORM);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setFormData(INITIAL_FORM);
+      setError('');
+    }
+  }, [user]);
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -72,6 +81,8 @@ const Login = () => {
         toast.error(`Login failed: ${errorMsg}`, { id: toastId });
         setLoading(false);
       } else {
+        setFormData(INITIAL_FORM);
+        setError('');
         toast.success('Signed in successfully! Redirecting...', { id: toastId });
         setTimeout(() => {
           navigate('/dashboard');
@@ -125,7 +136,7 @@ const Login = () => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="auth-form" id="login-form">
+          <form onSubmit={handleSubmit} className="auth-form" id="login-form" autoComplete="off">
             <div className="form-group">
               <label htmlFor="login-email" className="form-label">Email Address</label>
               <input
@@ -136,6 +147,7 @@ const Login = () => {
                 placeholder="you@example.com"
                 value={formData.email}
                 onChange={handleChange}
+                autoComplete="off"
                 required
               />
             </div>
@@ -150,12 +162,9 @@ const Login = () => {
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
+                autoComplete="new-password"
                 required
               />
-            </div>
-
-            <div className="auth-forgot">
-              <a href="#" id="forgot-password-link">Forgot password?</a>
             </div>
 
             {error && (
