@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import CandidateModal from '../components/CandidateModal';
+import { openResume } from '../utils/resume';
 
 export default function Applications() {
   const { user, profile } = useAuth();
@@ -386,16 +387,15 @@ function RecruiterApplicationsView() {
 
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       {(app.resume_url || candidate.resume_url) && (
-                        <a
-                          href={app.resume_url || candidate.resume_url}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => openResume(app.resume_url || candidate.resume_url)}
                           className="btn btn-secondary btn-sm"
                           title="Open Resume"
                           style={{ padding: '6px 12px' }}
                         >
                           <FileText size={14} /> Resume
-                        </a>
+                        </button>
                       )}
 
                       <button

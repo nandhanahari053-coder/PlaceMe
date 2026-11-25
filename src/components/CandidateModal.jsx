@@ -6,6 +6,7 @@ import {
   XCircle, Check, Briefcase 
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { openResume } from '../utils/resume';
 
 export default function CandidateModal({ isOpen, onClose, application, onStatusChange }) {
   if (!isOpen || !application) return null;
@@ -250,14 +251,13 @@ export default function CandidateModal({ isOpen, onClose, application, onStatusC
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Attached with application</div>
                 </div>
               </div>
-              <a
-                href={application.resume_url || candidate.resume_url}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => openResume(application.resume_url || candidate.resume_url)}
                 className="btn btn-primary btn-sm"
               >
                 <ExternalLink size={14} /> Open Resume
-              </a>
+              </button>
             </div>
           ) : (
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>

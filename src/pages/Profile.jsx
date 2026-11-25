@@ -3,13 +3,15 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { User, Mail, Phone, Book, GraduationCap, Code, MapPin, Building, Briefcase } from 'lucide-react';
+import { User, Mail, Phone, Book, GraduationCap, Code, MapPin, Building, Briefcase, FileText, Upload, ExternalLink, Trash2 } from 'lucide-react';
+import { uploadResumeFile, openResume, getResumeFileName } from '../utils/resume';
 
 export default function Profile() {
   const { user, profile, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(profile || {});
   const [msg, setMsg] = useState('');
+  const [uploadingResume, setUploadingResume] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -26,6 +28,34 @@ export default function Profile() {
   const handleSkillsChange = (e) => {
     const val = e.target.value;
     setFormData(prev => ({ ...prev, skills: val.split(',').map(s => s.trim()) }));
+  };
+
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingResume(true);
+    const tid = toast.loading('Uploading resume...');
+    try {
+      const { url } = await uploadResumeFile(file, user.id);
+      setFormData(prev => ({ ...prev, resume_url: url }));
+      const res = await updateProfile({ resume_url: url });
+      if (res?.error) throw new Error(res.error);
+      toast.success('Resume uploaded and saved!', { id: tid });
+    } catch (err) {
+      toast.error(err.message || 'Failed to upload resume.', { id: tid });
+    } finally {
+      setUploadingResume(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveResume = async () => {
+    setFormData(prev => ({ ...prev, resume_url: '' }));
+    const res = await updateProfile({ resume_url: '' });
+    if (!res?.error) {
+      toast.success('Resume removed.');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -118,8 +148,67 @@ export default function Profile() {
                     <input name="skills" className="form-input" value={formData.skills?.join(', ') || ''} onChange={handleSkillsChange} placeholder="e.g. React, Node.js, Python" />
                   </div>
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                    <label className="form-label">Resume Link (URL)</label>
-                    <input name="resume_url" className="form-input" value={formData.resume_url || ''} onChange={handleChange} />
+                    <label className="form-label">Resume Upload (PDF, DOC, DOCX)</label>
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      padding: '16px',
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px dashed var(--border-blue)',
+                      borderRadius: 'var(--r-md)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <FileText size={22} color="var(--blue-400)" />
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                            {formData.resume_url ? getResumeFileName(formData.resume_url) : 'No resume uploaded yet'}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            {formData.resume_url
+                              ? 'Automatically attached when you apply to jobs'
+                              : 'Upload your resume (PDF, DOC, DOCX · max 5 MB)'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        {formData.resume_url && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => openResume(formData.resume_url)}
+                            >
+                              <ExternalLink size={14} /> View
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger btn-sm"
+                              onClick={handleRemoveResume}
+                            >
+                              <Trash2 size={14} /> Remove
+                            </button>
+                          </>
+                        )}
+                        <label
+                          className="btn btn-primary btn-sm"
+                          style={{ cursor: uploadingResume ? 'wait' : 'pointer', opacity: uploadingResume ? 0.7 : 1 }}
+                        >
+                          <Upload size={14} />
+                          {uploadingResume ? 'Uploading...' : (formData.resume_url ? 'Replace File' : 'Upload Resume')}
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            onChange={handleResumeUpload}
+                            disabled={uploadingResume}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </>
               ) : (
@@ -207,6 +296,47 @@ export default function Profile() {
                 </div>
               )}
             </div>
+
+            {isStudent && (
+              <>
+                <div className="divider" style={{ margin: 0 }}></div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', color: 'var(--blue-400)' }}>Resume / CV</h3>
+                  {profile?.resume_url ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                      padding: '14px 18px',
+                      background: 'rgba(59,130,246,0.08)',
+                      border: '1px solid var(--border-blue)',
+                      borderRadius: 'var(--r-md)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <FileText size={22} color="var(--blue-400)" />
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>{getResumeFileName(profile.resume_url)}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Automatically sent with your job applications</div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => openResume(profile.resume_url)}
+                      >
+                        <ExternalLink size={14} /> View Resume
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      No resume uploaded yet. Click <strong>Edit Profile</strong> to upload your resume.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {isStudent && profile?.skills?.length > 0 && (
               <>

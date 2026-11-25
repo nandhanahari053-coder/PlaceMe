@@ -246,7 +246,7 @@ function RecruiterJobsView() {
 // STUDENT VIEW
 // ─────────────────────────────────────────────────────────────
 function StudentJobsView() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const companyParam = searchParams.get('company') || 'All';
 
@@ -308,8 +308,23 @@ function StudentJobsView() {
     setApplyingId(jobId);
     const tid = toast.loading('Submitting application...');
     try {
+      let resumeUrl = profile?.resume_url || null;
+      if (!resumeUrl) {
+        const { data: profData } = await supabase
+          .from('profiles')
+          .select('resume_url')
+          .eq('id', user.id)
+          .maybeSingle();
+        resumeUrl = profData?.resume_url || null;
+      }
+
       const { error } = await supabase.from('applications')
-        .insert([{ job_id: jobId, student_id: user.id, status: 'Applied' }]);
+        .insert([{
+          job_id: jobId,
+          student_id: user.id,
+          status: 'Applied',
+          resume_url: resumeUrl,
+        }]);
       if (error) throw error;
 
       // Increment applicants_count
